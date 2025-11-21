@@ -5,7 +5,7 @@ export function Home() {
         {/* Hero Section */}
         <div className="text-center mb-16 animate-fade-in-up">
           <h1 className="text-6xl font-bold text-gray-900 dark:text-white mb-4 animate-bounce-slow">
-            Welcome Home! 🏠
+            Welcome Home! 🏠 This is only a sample page to test CSS lint and animations
           </h1>
           <p className="text-xl text-gray-600 dark:text-gray-300 animate-fade-in">
             Your journey starts here
