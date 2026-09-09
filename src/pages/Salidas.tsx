@@ -340,6 +340,7 @@ function SalidaFormModal({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const { isSuperAdmin } = useRole();
   const [form, setForm] = useState<SalidaFormData>(initial);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -568,13 +569,15 @@ function SalidaFormModal({
           >
             Cancelar
           </button>
-          <button
-            onClick={() => handleReviewClick("draft")}
-            disabled={saving}
-            className="px-4 py-2 rounded-lg border border-blue-600 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 text-sm transition-colors disabled:opacity-50"
-          >
-            Guardar (borrador)
-          </button>
+          {!isSuperAdmin && (
+            <button
+              onClick={() => handleReviewClick("draft")}
+              disabled={saving}
+              className="px-4 py-2 rounded-lg border border-blue-600 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 text-sm transition-colors disabled:opacity-50"
+            >
+              Guardar (borrador)
+            </button>
+          )}
           <button
             onClick={() => handleReviewClick("confirmado")}
             disabled={saving}
@@ -582,7 +585,7 @@ function SalidaFormModal({
           >
             {saving ? (
               <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Guardando…</>
-            ) : "Confirmar"}
+            ) : (isSuperAdmin ? "Guardar" : "Confirmar")}
           </button>
         </div>
       </div>

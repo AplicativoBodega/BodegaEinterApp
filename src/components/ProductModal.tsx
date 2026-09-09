@@ -20,8 +20,6 @@ interface FormData {
   category_id: string;
   supplier_id: string;
   description: string;
-  price: string;
-  cost: string;
   stock: string;
   weight_kg: string;
   qty_per_carton: string;
@@ -44,8 +42,6 @@ const initialFormData: FormData = {
   category_id: "",
   supplier_id: "",
   description: "",
-  price: "",
-  cost: "",
   stock: "",
   weight_kg: "",
   qty_per_carton: "",
@@ -100,8 +96,6 @@ export function ProductModal({
         category_id: categoryId,
         supplier_id: String(product.supplier?.id || ""),
         description: product.description || "",
-        price: String(product.price || ""),
-        cost: String(product.cost || ""),
         stock: String(product.stock || ""),
         weight_kg: String(product.weight_kg || ""),
         qty_per_carton: product.qty_per_carton != null ? String(product.qty_per_carton) : "",
@@ -249,8 +243,6 @@ export function ProductModal({
         china_sku: formData.china_sku.trim() ? formData.china_sku.trim() : null,
         name: formData.name,
         category: formData.category_id,
-        price: parseFloat(formData.price) || 0,
-        cost: parseFloat(formData.cost) || 0,
         stock: parseFloat(formData.stock) || 0,
         weight_kg: parseFloat(formData.weight_kg) || 0,
         dimensions_cm: {
@@ -389,41 +381,6 @@ export function ProductModal({
               </select>
             </div>
           </div>
-
-          <div className="flex flex-row gap-4 mb-4">
-            <div className="flex-1">
-              <label className="text-sm font-robotoMedium text-gray-700 dark:text-gray-300 mb-2 block">
-                Precio
-              </label>
-              <input
-                type="number"
-                value={formData.price}
-                onChange={(e) =>
-                  setFormData({ ...formData, price: e.target.value })
-                }
-                placeholder="0.00"
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 dark:text-white"
-              />
-            </div>
-            <div className="flex-1">
-              <label className="text-sm font-robotoMedium text-gray-700 dark:text-gray-300 mb-2 block">
-                Costo
-              </label>
-              <input
-                type="number"
-                value={formData.cost}
-                onChange={(e) =>
-                  setFormData({ ...formData, cost: e.target.value })
-                }
-                placeholder="0.00"
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 dark:text-white"
-              />
-            </div>
-          </div>
-
-          {mode === "edit" && product && (
-            <PrecioHistorial productId={product.id} />
-          )}
 
           <div className="flex flex-row gap-4 mb-4">
             <div className="flex-1">
@@ -671,208 +628,6 @@ export function ProductModal({
           </div>
         </div>
       </div>
-    </div>
-  );
-}
-
-// ─── Historial de precios ─────────────────────────────────────────────────
-
-interface PrecioHistorialRow {
-  id_historial: number;
-  precio: number | null;
-  costo: number | null;
-  vigente_desde: string;
-  vigente_hasta: string | null;
-}
-
-function PrecioHistorial({ productId }: { productId: number }) {
-  const [rows, setRows] = useState<PrecioHistorialRow[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [open, setOpen] = useState(false);
-
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [addPrecio, setAddPrecio] = useState("");
-  const [addCosto, setAddCosto] = useState("");
-  const [addDesde, setAddDesde] = useState("");
-  const [addHasta, setAddHasta] = useState("");
-  const [addSaving, setAddSaving] = useState(false);
-  const [addError, setAddError] = useState<string | null>(null);
-
-  const loadHistorial = () => {
-    setLoading(true);
-    fetchAPI(`/api/productos/${productId}/precio-historial`)
-      .then((raw) => setRows(raw as PrecioHistorialRow[]))
-      .catch(() => setRows([]))
-      .finally(() => setLoading(false));
-  };
-
-  useEffect(() => {
-    if (!open || rows.length > 0) return;
-    loadHistorial();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, productId]);
-
-  const handleAdd = async () => {
-    setAddError(null);
-    if (!addDesde) { setAddError("La fecha 'Vigente desde' es requerida."); return; }
-    if (!addPrecio && !addCosto) { setAddError("Captura al menos precio o costo."); return; }
-    setAddSaving(true);
-    try {
-      await fetchAPI(`/api/productos/${productId}/precio-historial`, {
-        method: "POST",
-        body: JSON.stringify({
-          precio: addPrecio !== "" ? parseFloat(addPrecio) : null,
-          costo: addCosto !== "" ? parseFloat(addCosto) : null,
-          vigente_desde: addDesde,
-          vigente_hasta: addHasta || null,
-        }),
-      });
-      setAddPrecio(""); setAddCosto(""); setAddDesde(""); setAddHasta("");
-      setShowAddForm(false);
-      loadHistorial();
-    } catch (err) {
-      setAddError((err as Error).message);
-    } finally {
-      setAddSaving(false);
-    }
-  };
-
-  const handleDelete = async (id_historial: number) => {
-    if (!window.confirm("¿Eliminar este registro del historial?")) return;
-    try {
-      await fetchAPI(`/api/productos/${productId}/precio-historial/${id_historial}`, { method: "DELETE" });
-      setRows((prev) => prev.filter((r) => r.id_historial !== id_historial));
-    } catch (err) {
-      alert((err as Error).message);
-    }
-  };
-
-  return (
-    <div className="mb-4">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="text-sm font-robotoMedium text-blue-600 dark:text-blue-400 hover:underline"
-      >
-        {open ? "▾" : "▸"} Historial de precios
-      </button>
-      {open && (
-        <div className="mt-2 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-          {loading ? (
-            <p className="text-sm text-gray-400 dark:text-gray-500 p-3">Cargando…</p>
-          ) : rows.length === 0 ? (
-            <p className="text-sm text-gray-400 dark:text-gray-500 p-3">Sin historial registrado todavía.</p>
-          ) : (
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 dark:bg-gray-900/40">
-                <tr className="text-left text-xs text-gray-500 dark:text-gray-400">
-                  <th className="px-3 py-1.5">Vigente desde</th>
-                  <th className="px-3 py-1.5">Vigente hasta</th>
-                  <th className="px-3 py-1.5 text-right">Precio</th>
-                  <th className="px-3 py-1.5 text-right">Costo</th>
-                  <th className="px-3 py-1.5 w-8" />
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((r) => (
-                  <tr key={r.id_historial} className="border-t border-gray-100 dark:border-gray-800">
-                    <td className="px-3 py-1.5 text-gray-700 dark:text-gray-300">{r.vigente_desde?.slice(0, 10)}</td>
-                    <td className="px-3 py-1.5 text-gray-700 dark:text-gray-300">
-                      {r.vigente_hasta ? r.vigente_hasta.slice(0, 10) : "Actual"}
-                    </td>
-                    <td className="px-3 py-1.5 text-right text-gray-900 dark:text-white">
-                      {r.precio != null ? Number(r.precio).toFixed(2) : "-"}
-                    </td>
-                    <td className="px-3 py-1.5 text-right text-gray-900 dark:text-white">
-                      {r.costo != null ? Number(r.costo).toFixed(2) : "-"}
-                    </td>
-                    <td className="px-3 py-1.5 text-center">
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(r.id_historial)}
-                        className="text-gray-400 hover:text-red-500 transition-colors"
-                        title="Eliminar registro"
-                      >
-                        ✕
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-
-          <div className="border-t border-gray-200 dark:border-gray-700 p-3">
-            {!showAddForm ? (
-              <button
-                type="button"
-                onClick={() => setShowAddForm(true)}
-                className="text-xs font-robotoMedium text-blue-600 dark:text-blue-400 hover:underline"
-              >
-                + Agregar registro con fecha pasada
-              </button>
-            ) : (
-              <div className="space-y-2">
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Para capturar precios/costos anteriores a que este producto se diera de alta en el sistema.
-                </p>
-                {addError && <p className="text-xs text-red-500">{addError}</p>}
-                <div className="grid grid-cols-4 gap-2">
-                  <div>
-                    <label className="block text-[10px] text-gray-500 dark:text-gray-400 mb-0.5">Precio</label>
-                    <input
-                      type="number" step="0.01" value={addPrecio}
-                      onChange={(e) => setAddPrecio(e.target.value)}
-                      className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-white text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] text-gray-500 dark:text-gray-400 mb-0.5">Costo</label>
-                    <input
-                      type="number" step="0.01" value={addCosto}
-                      onChange={(e) => setAddCosto(e.target.value)}
-                      className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-white text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] text-gray-500 dark:text-gray-400 mb-0.5">Vigente desde</label>
-                    <input
-                      type="date" value={addDesde}
-                      onChange={(e) => setAddDesde(e.target.value)}
-                      className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-white text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] text-gray-500 dark:text-gray-400 mb-0.5">Vigente hasta</label>
-                    <input
-                      type="date" value={addHasta}
-                      onChange={(e) => setAddHasta(e.target.value)}
-                      className="w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 dark:text-white text-xs"
-                    />
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => { setShowAddForm(false); setAddError(null); }}
-                    className="px-3 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleAdd}
-                    disabled={addSaving}
-                    className="px-3 py-1 text-xs rounded bg-blue-600 text-white disabled:opacity-50"
-                  >
-                    {addSaving ? "Guardando…" : "Guardar"}
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

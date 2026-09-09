@@ -14,6 +14,7 @@ import { Ubicaciones } from './pages/Ubicaciones'
 import { Movimientos } from './pages/Movimientos'
 import { Salidas } from './pages/Salidas'
 import { VentasHomeDepot } from './pages/VentasHomeDepot'
+import { CostosVariables } from './pages/CostosVariables'
 import { InventarioInteligente } from './pages/InventarioInteligente'
 import { UnderConstruction } from './components/UnderConstruction'
 import { PedidoPersonalizado } from './pages/PedidoPersonalizado'
@@ -21,6 +22,7 @@ import { Categorias } from './pages/Categorias'
 import Profile from './components/Profile'
 import { UserManagement } from './pages/UserManagement'
 import { Entradas } from './pages/Entradas'
+import { Merma } from './pages/Merma'
 import { Facturas } from './pages/Facturas'
 import { Bitacora } from './pages/Bitacora'
 import { RoleGuard } from './components/RoleGuard'
@@ -54,6 +56,8 @@ function App() {
         return <Salidas/>
       case 'ventas-homedepot':
         return <VentasHomeDepot/>
+      case 'costos-variables':
+        return <CostosVariables/>
       case 'inventario-inteligente':
         return <InventarioInteligente />
       case 'pedido-personalizado':
@@ -63,7 +67,7 @@ function App() {
       case 'entradas':
         return <Entradas />
       case 'merma':
-        return <UnderConstruction title="Merma" />
+        return <Merma />
       case 'facturas':
         return (
           <RoleGuard requireSuperAdmin={true} fallback={ACCESO_DENEGADO}>

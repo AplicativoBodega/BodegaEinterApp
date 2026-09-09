@@ -75,6 +75,8 @@ export function Facturas() {
   const [ordenDetalle, setOrdenDetalle] = useState<OrdenDetalle | null>(null);
   const [ordenDetalleLoading, setOrdenDetalleLoading] = useState(false);
 
+  const [saldoOrden, setSaldoOrden] = useState<OrdenRow | null>(null);
+
   const [pagoFolio, setPagoFolio] = useState<string | null>(null);
   const [pagoDetalle, setPagoDetalle] = useState<PagoDetalle | null>(null);
   const [pagoDetalleLoading, setPagoDetalleLoading] = useState(false);
@@ -260,9 +262,17 @@ export function Facturas() {
                     )}
                   </div>
                   <div className="py-4 px-4 border-r border-gray-200 dark:border-gray-600 flex items-center justify-center text-sm font-semibold">
-                    {orden.importe_factura != null
-                      ? formatMoney(orden.importe_factura, orden.importe_factura_moneda)
-                      : <span className="text-gray-400 dark:text-gray-500 font-normal">-</span>}
+                    {orden.importe_factura != null ? (
+                      <button
+                        onClick={() => setSaldoOrden(orden)}
+                        className="hover:underline decoration-dotted"
+                        title="Ver saldo"
+                      >
+                        {formatMoney(orden.importe_factura, orden.importe_factura_moneda)}
+                      </button>
+                    ) : (
+                      <span className="text-gray-400 dark:text-gray-500 font-normal">-</span>
+                    )}
                   </div>
                   <div className="py-4 px-4 border-r border-gray-200 dark:border-gray-600 flex items-center justify-center">
                     <button
@@ -346,6 +356,35 @@ export function Facturas() {
                 </table>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mini ventana de saldo */}
+      {saldoOrden && saldoOrden.importe_factura != null && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => setSaldoOrden(null)}>
+          <div className="bg-white dark:bg-gray-800 rounded-xl w-full max-w-xs shadow-2xl p-5 text-center" onClick={(e) => e.stopPropagation()}>
+            <p className="text-xs text-gray-500 dark:text-gray-400 font-mono mb-1">{saldoOrden.folio_orden}</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Saldo pendiente</p>
+            <p className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+              {formatMoney(
+                Math.max(0, saldoOrden.importe_factura - (pagados[saldoOrden.folio_orden]?.pagado ?? 0)),
+                saldoOrden.importe_factura_moneda
+              )}
+            </p>
+            <p className="text-xs text-gray-400 dark:text-gray-500 mb-4">
+              de {formatMoney(saldoOrden.importe_factura, saldoOrden.importe_factura_moneda)} total
+            </p>
+            <button
+              onClick={() => { const folio = saldoOrden.folio_orden; setSaldoOrden(null); openPago(folio); }}
+              className="w-full px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium mb-2"
+            >
+              Ver transacciones
+            </button>
+            <button onClick={() => setSaldoOrden(null)}
+              className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 text-sm">
+              Cerrar
+            </button>
           </div>
         </div>
       )}

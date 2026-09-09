@@ -1593,15 +1593,17 @@ export function Entradas() {
               >
                 Cancelar
               </button>
-              <button
-                onClick={() => handleReviewClick("draft")}
-                disabled={
-                  createLoading || !createFolio.trim() || !createFecha
-                }
-                className="px-6 py-2 rounded-lg border border-blue-600 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 text-sm font-robotoMedium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Guardar (borrador)
-              </button>
+              {!isSuperAdmin && (
+                <button
+                  onClick={() => handleReviewClick("draft")}
+                  disabled={
+                    createLoading || !createFolio.trim() || !createFecha
+                  }
+                  className="px-6 py-2 rounded-lg border border-blue-600 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 text-sm font-robotoMedium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Guardar (borrador)
+                </button>
+              )}
               <button
                 onClick={() => handleReviewClick("confirmado")}
                 disabled={
@@ -1615,7 +1617,7 @@ export function Entradas() {
                     Guardando…
                   </>
                 ) : (
-                  "Confirmar"
+                  isSuperAdmin ? "Guardar" : "Confirmar"
                 )}
               </button>
             </div>
