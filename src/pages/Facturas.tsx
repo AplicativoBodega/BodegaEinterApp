@@ -76,6 +76,7 @@ export function Facturas() {
   const [ordenDetalleLoading, setOrdenDetalleLoading] = useState(false);
 
   const [saldoOrden, setSaldoOrden] = useState<OrdenRow | null>(null);
+  const [showSaldoGlobal, setShowSaldoGlobal] = useState(false);
 
   const [pagoFolio, setPagoFolio] = useState<string | null>(null);
   const [pagoDetalle, setPagoDetalle] = useState<PagoDetalle | null>(null);
@@ -189,13 +190,64 @@ export function Facturas() {
     }
   };
 
+  // Same as handleAddPago, but for the compact saldo popup: stays open and
+  // just refreshes the pagados totals instead of opening the full detail.
+  const handleAddPagoRapido = async (folio: string) => {
+    if (!pagoMonto || Number(pagoMonto) <= 0) { setPagoError("Monto inválido"); return; }
+    if (!pagoTasa || Number(pagoTasa) <= 0) { setPagoError("Tasa inválida"); return; }
+    setPagoSaving(true);
+    setPagoError(null);
+    try {
+      await fetchAPI(`/api/facturas/${encodeURIComponent(folio)}/pagos`, {
+        method: "POST",
+        body: JSON.stringify({ monto: Number(pagoMonto), tasa: Number(pagoTasa), fecha: pagoFecha }),
+      });
+      const [pagadosRaw] = await Promise.all([fetchAPI("/api/facturas")]);
+      const map: Record<string, PagadoRow> = {};
+      for (const p of (pagadosRaw as { data: PagadoRow[] }).data ?? []) {
+        map[p.folio_orden] = { ...p, pagado: Number(p.pagado), pagado_mxn: Number(p.pagado_mxn) };
+      }
+      setPagados(map);
+      setPagoMonto(""); setPagoTasa("");
+      setToast({ ok: true, text: "Dinero agregado" });
+    } catch (err) {
+      setPagoError((err as Error).message);
+    } finally {
+      setPagoSaving(false);
+    }
+  };
+
+  const ordenesConSaldo = ordenes
+    .filter((o) => o.importe_factura != null && o.importe_factura_moneda === "USD")
+    .map((o) => ({
+      orden: o,
+      saldo: Math.max(0, (o.importe_factura as number) - (pagados[o.folio_orden]?.pagado ?? 0)),
+    }))
+    .filter((x) => x.saldo > 0)
+    .sort((a, b) => b.saldo - a.saldo);
+
+  const saldoTotalUsd = ordenesConSaldo.reduce((s, x) => s + x.saldo, 0);
+
   return (
     <div className="w-full bg-gray-50 dark:bg-gray-900 flex flex-col min-h-screen">
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-8 py-6">
-        <h1 className="text-3xl font-bold tracking-wide text-gray-900 dark:text-white">Facturas</h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-          Órdenes de Entradas — consulta la factura subida y registra abonos.
-        </p>
+      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-8 py-6 flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-3xl font-bold tracking-wide text-gray-900 dark:text-white">Facturas</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+            Órdenes de Entradas — consulta la factura subida y registra abonos.
+          </p>
+        </div>
+
+        <button
+          onClick={() => setShowSaldoGlobal(true)}
+          className="text-right rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 px-5 py-3 hover:bg-gray-100 dark:hover:bg-gray-900/70 transition-colors"
+        >
+          <p className="text-xs text-gray-500 dark:text-gray-400">Saldo pendiente (USD)</p>
+          <p className="text-2xl font-bold text-gray-900 dark:text-white">
+            {formatMoney(saldoTotalUsd, "USD")}
+          </p>
+          <p className="text-[11px] text-blue-600 dark:text-blue-400 mt-0.5">Ver transacciones →</p>
+        </button>
       </div>
 
       <div className="flex-1 bg-white dark:bg-gray-800 mx-8 mt-4 mb-8 border border-gray-400 dark:border-gray-700 overflow-hidden flex flex-col rounded-lg">
@@ -264,7 +316,10 @@ export function Facturas() {
                   <div className="py-4 px-4 border-r border-gray-200 dark:border-gray-600 flex items-center justify-center text-sm font-semibold">
                     {orden.importe_factura != null ? (
                       <button
-                        onClick={() => setSaldoOrden(orden)}
+                        onClick={() => {
+                          setSaldoOrden(orden);
+                          setPagoMonto(""); setPagoTasa(""); setPagoFecha(getMonterreyDateISO()); setPagoError(null);
+                        }}
                         className="hover:underline decoration-dotted"
                         title="Ver saldo"
                       >
@@ -360,31 +415,99 @@ export function Facturas() {
         </div>
       )}
 
+      {/* Saldo global (esquina superior derecha) */}
+      {showSaldoGlobal && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => setShowSaldoGlobal(false)}>
+          <div className="bg-white dark:bg-gray-800 rounded-xl w-full max-w-md shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+              <div>
+                <h2 className="text-lg font-medium text-gray-900 dark:text-white">Saldo pendiente (USD)</h2>
+                <p className="text-xl font-bold text-gray-900 dark:text-white">{formatMoney(saldoTotalUsd, "USD")}</p>
+              </div>
+              <button onClick={() => setShowSaldoGlobal(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xl leading-none">✕</button>
+            </div>
+            <div className="max-h-80 overflow-auto">
+              {ordenesConSaldo.length === 0 ? (
+                <p className="text-sm text-gray-400 dark:text-gray-500 p-6 text-center">Sin saldos pendientes en USD.</p>
+              ) : (
+                ordenesConSaldo.map(({ orden, saldo }) => (
+                  <button
+                    key={orden.folio_orden}
+                    onClick={() => { setShowSaldoGlobal(false); openPago(orden.folio_orden); }}
+                    className="w-full flex items-center justify-between px-6 py-3 border-b border-gray-100 dark:border-gray-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors text-left"
+                  >
+                    <span className="font-mono text-sm text-gray-700 dark:text-gray-300">{orden.folio_orden}</span>
+                    <span className="text-sm font-semibold text-gray-900 dark:text-white">{formatMoney(saldo, "USD")}</span>
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Mini ventana de saldo */}
       {saldoOrden && saldoOrden.importe_factura != null && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => setSaldoOrden(null)}>
-          <div className="bg-white dark:bg-gray-800 rounded-xl w-full max-w-xs shadow-2xl p-5 text-center" onClick={(e) => e.stopPropagation()}>
-            <p className="text-xs text-gray-500 dark:text-gray-400 font-mono mb-1">{saldoOrden.folio_orden}</p>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Saldo pendiente</p>
-            <p className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
-              {formatMoney(
-                Math.max(0, saldoOrden.importe_factura - (pagados[saldoOrden.folio_orden]?.pagado ?? 0)),
-                saldoOrden.importe_factura_moneda
-              )}
-            </p>
-            <p className="text-xs text-gray-400 dark:text-gray-500 mb-4">
-              de {formatMoney(saldoOrden.importe_factura, saldoOrden.importe_factura_moneda)} total
-            </p>
-            <button
-              onClick={() => { const folio = saldoOrden.folio_orden; setSaldoOrden(null); openPago(folio); }}
-              className="w-full px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium mb-2"
-            >
-              Ver transacciones
-            </button>
-            <button onClick={() => setSaldoOrden(null)}
-              className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 text-sm">
-              Cerrar
-            </button>
+          <div className="bg-white dark:bg-gray-800 rounded-xl w-full max-w-md shadow-2xl p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="text-center mb-5">
+              <p className="text-xs text-gray-500 dark:text-gray-400 font-mono mb-1">{saldoOrden.folio_orden}</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Saldo pendiente</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
+                {formatMoney(
+                  Math.max(0, saldoOrden.importe_factura - (pagados[saldoOrden.folio_orden]?.pagado ?? 0)),
+                  saldoOrden.importe_factura_moneda
+                )}
+              </p>
+              <p className="text-xs text-gray-400 dark:text-gray-500">
+                de {formatMoney(saldoOrden.importe_factura, saldoOrden.importe_factura_moneda)} total
+              </p>
+            </div>
+
+            <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+              <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Agregar dinero (abono)</h3>
+              {pagoError && <p className="text-sm text-red-500 mb-2">{pagoError}</p>}
+              <div className="grid grid-cols-3 gap-3 items-end">
+                <div>
+                  <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Monto</label>
+                  <input type="number" min="0" step="0.01" value={pagoMonto} onChange={(e) => setPagoMonto(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm" />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Tasa</label>
+                  <input type="number" min="0" step="0.0001" value={pagoTasa} onChange={(e) => setPagoTasa(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm" />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Fecha</label>
+                  <input type="date" value={pagoFecha} onChange={(e) => setPagoFecha(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm" />
+                </div>
+              </div>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
+                Equivalente en MXN: <span className="font-semibold text-gray-600 dark:text-gray-300">{formatMoney(montoMxnPreview)}</span>
+              </p>
+              <button
+                onClick={() => handleAddPagoRapido(saldoOrden.folio_orden)}
+                disabled={pagoSaving}
+                className="w-full mt-3 px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-medium disabled:opacity-50"
+              >
+                {pagoSaving ? "Guardando…" : "+ Agregar dinero"}
+              </button>
+            </div>
+
+            <div className="flex gap-2 mt-4">
+              <button
+                onClick={() => { const folio = saldoOrden.folio_orden; setSaldoOrden(null); openPago(folio); }}
+                className="flex-1 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 text-sm font-medium"
+              >
+                Ver todas las transacciones
+              </button>
+              <button onClick={() => setSaldoOrden(null)}
+                className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 text-sm">
+                Cerrar
+              </button>
+            </div>
           </div>
         </div>
       )}

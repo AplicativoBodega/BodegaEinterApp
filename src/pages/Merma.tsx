@@ -24,6 +24,95 @@ interface Razon {
   nombre: string;
 }
 
+function GestionarRazonesModal({
+  razones, onClose, onChanged,
+}: {
+  razones: Razon[]; onClose: () => void; onChanged: () => void;
+}) {
+  const [nombre, setNombre] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+
+  const handleAdd = async () => {
+    if (!nombre.trim()) return;
+    setError(null);
+    setSaving(true);
+    try {
+      await fetchAPI("/api/merma/razones", {
+        method: "POST",
+        body: JSON.stringify({ nombre: nombre.trim() }),
+      });
+      setNombre("");
+      onChanged();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (id_razon: number) => {
+    if (!window.confirm("¿Desactivar esta razón? Ya no aparecerá para nuevas mermas.")) return;
+    setDeletingId(id_razon);
+    try {
+      await fetchAPI(`/api/merma/razones/${id_razon}`, { method: "DELETE" });
+      onChanged();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-xl w-full max-w-md shadow-2xl">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+          <h2 className="text-xl font-medium text-gray-900 dark:text-white">Razones de merma</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xl leading-none">✕</button>
+        </div>
+        <div className="px-6 py-5 space-y-4">
+          {error && (
+            <div className="p-3 rounded-lg bg-red-50 dark:bg-red-900/40 border border-red-300 dark:border-red-600 text-red-800 dark:text-red-200 text-sm">
+              {error}
+            </div>
+          )}
+          <div className="space-y-1 max-h-60 overflow-auto">
+            {razones.length === 0 ? (
+              <p className="text-sm text-gray-400 dark:text-gray-500">Sin razones activas.</p>
+            ) : razones.map((r) => (
+              <div key={r.id_razon} className="flex items-center justify-between py-1.5 px-3 rounded bg-gray-50 dark:bg-gray-900/40 text-sm">
+                <span className="text-gray-800 dark:text-gray-200">{r.nombre}</span>
+                <button onClick={() => handleDelete(r.id_razon)} disabled={deletingId === r.id_razon}
+                  className="text-gray-400 hover:text-red-500 transition-colors text-xs disabled:opacity-50">
+                  {deletingId === r.id_razon ? "…" : "Desactivar"}
+                </button>
+              </div>
+            ))}
+          </div>
+          <div className="flex gap-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+            <input value={nombre} onChange={(e) => setNombre(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+              placeholder="Nueva razón…"
+              className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm" />
+            <button onClick={handleAdd} disabled={saving}
+              className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm disabled:opacity-50">
+              {saving ? "…" : "Agregar"}
+            </button>
+          </div>
+        </div>
+        <div className="flex items-center justify-end px-6 py-4 border-t border-gray-200 dark:border-gray-700">
+          <button onClick={onClose}
+            className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 text-sm">
+            Cerrar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function formatDate(iso: string) {
   const d = new Date(iso);
   return d.toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" });
@@ -59,6 +148,8 @@ export function Merma() {
   const [deleteRow, setDeleteRow] = useState<MermaRow | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
+  const [gestionarRazonesVisible, setGestionarRazonesVisible] = useState(false);
+
   const [toast, setToast] = useState<{ ok: boolean; text: string } | null>(null);
 
   useEffect(() => {
@@ -66,6 +157,12 @@ export function Merma() {
     const t = setTimeout(() => setToast(null), 3500);
     return () => clearTimeout(t);
   }, [toast]);
+
+  useEffect(() => {
+    fetchAPI("/api/merma/razones")
+      .then((raw) => setRazones(raw as Razon[]))
+      .catch(() => {/* non-fatal */});
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -176,12 +273,22 @@ export function Merma() {
             Registra pérdidas de inventario; se descuenta automáticamente del stock.
           </p>
         </div>
-        <button
-          onClick={openCreate}
-          className="px-6 py-2 border border-black dark:border-white hover:bg-black dark:hover:bg-white hover:text-white dark:hover:text-black transition-colors text-sm font-medium text-gray-900 dark:text-white"
-        >
-          + Nueva Merma
-        </button>
+        <div className="flex items-center gap-3">
+          {isSuperAdmin && (
+            <button
+              onClick={() => setGestionarRazonesVisible(true)}
+              className="px-4 py-2 border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 text-sm font-medium text-gray-700 dark:text-gray-300 rounded-lg transition-colors"
+            >
+              ⚙️ Razones
+            </button>
+          )}
+          <button
+            onClick={openCreate}
+            className="px-6 py-2 border border-black dark:border-white hover:bg-black dark:hover:bg-white hover:text-white dark:hover:text-black transition-colors text-sm font-medium text-gray-900 dark:text-white"
+          >
+            + Nueva Merma
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 bg-white dark:bg-gray-800 mx-8 mt-4 mb-8 border border-gray-400 dark:border-gray-700 overflow-hidden flex flex-col rounded-lg">
@@ -366,6 +473,14 @@ export function Merma() {
             </div>
           </div>
         </div>
+      )}
+
+      {gestionarRazonesVisible && (
+        <GestionarRazonesModal
+          razones={razones}
+          onClose={() => setGestionarRazonesVisible(false)}
+          onChanged={loadRazones}
+        />
       )}
     </div>
   );

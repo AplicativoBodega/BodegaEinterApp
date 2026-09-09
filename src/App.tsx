@@ -16,8 +16,8 @@ import { Salidas } from './pages/Salidas'
 import { VentasHomeDepot } from './pages/VentasHomeDepot'
 import { CostosVariables } from './pages/CostosVariables'
 import { InventarioInteligente } from './pages/InventarioInteligente'
-import { UnderConstruction } from './components/UnderConstruction'
 import { PedidoPersonalizado } from './pages/PedidoPersonalizado'
+import { THDComparativo } from './pages/THDComparativo'
 import { Categorias } from './pages/Categorias'
 import Profile from './components/Profile'
 import { UserManagement } from './pages/UserManagement'
@@ -63,7 +63,7 @@ function App() {
       case 'pedido-personalizado':
         return <PedidoPersonalizado />
       case 'thd-comparativo':
-        return <UnderConstruction title="THD Comparativo" />
+        return <THDComparativo />
       case 'entradas':
         return <Entradas />
       case 'merma':
